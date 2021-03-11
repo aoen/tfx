@@ -14,54 +14,50 @@
 """Interfaces and functionality for dealing with service jobs."""
 
 import abc
-import enum
+from typing import Set
 
 from tfx.orchestration.experimental.core import pipeline_state as pstate
-
-
-@enum.unique
-class ServiceStatus(enum.Enum):
-  UNKNOWN = 0
-  RUNNING = 1
-  SUCCESS = 2
-  FAILED = 3
+from tfx.orchestration.experimental.core import task as task_lib
 
 
 class ServiceJobManager(abc.ABC):
-  """Interface for service job manager.
-
-  Service jobs are long-running jobs associated with a node or a pipeline that
-  persist across executions (eg: worker pools, Tensorboard, etc). Service jobs
-  should be started before the nodes that depend on them can be run.
-  """
+  """Interface for service job manager."""
 
   @abc.abstractmethod
-  def ensure_node_services(self, pipeline_state: pstate.PipelineState,
-                           node_id: str) -> ServiceStatus:
-    """Ensures necessary service jobs are started and healthy for the node.
+  def ensure_services(
+      self, pipeline_state: pstate.PipelineState) -> Set[task_lib.NodeUid]:
+    """Ensures necessary service jobs are started and healthy for the pipeline.
 
-    `ensure_node_services` will be called in the orchestration loop periodically
-    and is expected to:
+    Service jobs are long-running jobs associated with a node or the pipeline
+    that persist across executions (eg: worker pools, Tensorboard, etc). Service
+    jobs are started before the nodes that depend on them are started.
 
-    * Start any service jobs required by the pipeline node.
-    * Probe job health, handle failure and return appropriate status.
+    `ensure_services` will be called in the orchestration loop periodically and
+    is expected to:
+
+    1. Start any service jobs required by the pipeline nodes.
+    2. Probe job health and handle failures. If a service job fails, the
+       corresponding node uids should be returned.
+    3. Optionally stop service jobs that are no longer needed. Whether or not a
+       service job is needed is context dependent, for eg: in a typical sync
+       pipeline, one may want Tensorboard job to continue running even after the
+       corresponding trainer has completed but others like worker pool services
+       may be shutdown.
 
     Args:
       pipeline_state: A `PipelineState` object for an active pipeline.
-      node_id: Id of the node to ensure services.
 
     Returns:
-      Status of the service job(s) for the node.
+      List of NodeUids of nodes whose service jobs are in a state of permanent
+      failure.
     """
 
   @abc.abstractmethod
-  def stop_node_services(self, pipeline_state: pstate.PipelineState,
-                         node_id: str) -> None:
-    """Stops service jobs (if any) associated with the node.
+  def stop_services(self, pipeline_state: pstate.PipelineState) -> None:
+    """Stops all service jobs associated with the pipeline.
 
     Args:
       pipeline_state: A `PipelineState` object for an active pipeline.
-      node_id: Id of the node to stop services.
     """
 
   @abc.abstractmethod
@@ -76,19 +72,3 @@ class ServiceJobManager(abc.ABC):
     Returns:
       `True` if the node only has service job(s).
     """
-
-
-class DummyServiceJobManager(ServiceJobManager):
-  """A service job manager for environments without service jobs support."""
-
-  def ensure_node_services(self, unused_pipeline_state: pstate.PipelineState,
-                           unused_node_id: str) -> ServiceStatus:
-    raise NotImplementedError('Service jobs not supported.')
-
-  def stop_node_services(self, unused_pipeline_state: pstate.PipelineState,
-                         unused_node_id: str) -> None:
-    raise NotImplementedError('Service jobs not supported.')
-
-  def is_pure_service_node(self, unused_pipeline_state: pstate.PipelineState,
-                           unused_node_id: str) -> bool:
-    return False

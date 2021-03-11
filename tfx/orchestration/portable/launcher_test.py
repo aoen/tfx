@@ -18,7 +18,6 @@ import os
 import mock
 import tensorflow as tf
 from tfx import types
-from tfx import version as tfx_version
 from tfx.dsl.compiler import constants
 from tfx.orchestration import metadata
 from tfx.orchestration.portable import base_driver
@@ -165,12 +164,6 @@ class LauncherTest(test_case_utils.TfxTest):
     pipeline_root = os.path.join(
         os.environ.get('TEST_UNDECLARED_OUTPUTS_DIR', self.get_temp_dir()),
         self.id())
-
-    # Set a constant version for artifact version tag.
-    patcher = mock.patch('tfx.version.__version__')
-    patcher.start()
-    tfx_version.__version__ = '0.123.4.dev'
-    self.addCleanup(patcher.stop)
 
     # Makes sure multiple connections within a test always connect to the same
     # MLMD instance.
@@ -330,12 +323,6 @@ class LauncherTest(test_case_utils.TfxTest):
               string_value: ":test_run_0:my_trainer:model:0"
             }
           }
-          custom_properties {
-            key: "tfx_version"
-            value {
-              string_value: "0.123.4.dev"
-            }
-          }
           state: LIVE""",
           artifact,
           ignored_fields=[
@@ -380,12 +367,6 @@ class LauncherTest(test_case_utils.TfxTest):
             key: "name"
             value {
               string_value: ":test_run_0:my_trainer:model:0"
-            }
-          }
-          custom_properties {
-            key: "tfx_version"
-            value {
-              string_value: "0.123.4.dev"
             }
           }
           state: LIVE""",
@@ -450,12 +431,6 @@ class LauncherTest(test_case_utils.TfxTest):
               string_value: ":test_run_0:my_trainer:model:0"
             }
           }
-          custom_properties {
-            key: "tfx_version"
-            value {
-              string_value: "0.123.4.dev"
-            }
-          }
           state: LIVE""",
           artifact,
           ignored_fields=[
@@ -485,12 +460,6 @@ class LauncherTest(test_case_utils.TfxTest):
             key: "name"
             value {
               string_value: ":test_run_0:my_trainer:model:0"
-            }
-          }
-          custom_properties {
-            key: "tfx_version"
-            value {
-              string_value: "0.123.4.dev"
             }
           }
           state: LIVE""",
@@ -605,12 +574,6 @@ class LauncherTest(test_case_utils.TfxTest):
               int_value: 0
             }
           }
-          custom_properties {
-            key: "tfx_version"
-            value {
-              string_value: "0.123.4.dev"
-            }
-          }
           state: LIVE""",
           artifact,
           ignored_fields=[
@@ -657,12 +620,6 @@ class LauncherTest(test_case_utils.TfxTest):
             key: "version"
             value {
               int_value: 2
-            }
-          }
-          custom_properties {
-            key: "tfx_version"
-            value {
-              string_value: "0.123.4.dev"
             }
           }
           state: LIVE""",

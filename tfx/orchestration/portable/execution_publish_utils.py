@@ -15,7 +15,6 @@
 import copy
 import os
 from typing import List, Mapping, MutableMapping, Optional, Sequence, cast
-from absl import logging
 
 from tfx import types
 from tfx.orchestration import metadata
@@ -44,8 +43,7 @@ def _check_validity(new_artifact: metadata_store_pb2.Artifact,
   else:
     # If there is only one output artifact, its URI should not be changed
     if new_artifact.uri != original_artifact.uri:
-      # TODO(b/175426744): Data Binder will modify the uri.
-      logging.warning(
+      raise RuntimeError(
           'When there is one artifact to publish, the URI of it should be '
           'identical to the URI of system generated artifact.')
 

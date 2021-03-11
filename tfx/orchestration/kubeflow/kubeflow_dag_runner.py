@@ -17,16 +17,19 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import datetime
 import os
 import re
-from typing import Callable, Dict, List, Optional, Text, Type
+from typing import Callable, Dict, List, Optional, Text, Type, cast
 
+from absl import logging
 from kfp import compiler
 from kfp import dsl
 from kfp import gcp
 from kubernetes import client as k8s_client
-
 from tfx import version
+from tfx.dsl.compiler import compiler as tfx_compiler
+from tfx.dsl.compiler import constants
 from tfx.orchestration import data_types
 from tfx.orchestration import pipeline as tfx_pipeline
 from tfx.orchestration import tfx_runner
@@ -38,8 +41,10 @@ from tfx.orchestration.kubeflow.proto import kubeflow_pb2
 from tfx.orchestration.launcher import base_component_launcher
 from tfx.orchestration.launcher import in_process_component_launcher
 from tfx.orchestration.launcher import kubernetes_component_launcher
+from tfx.orchestration.portable import runtime_parameter_utils
 from tfx.utils import json_utils
 from tfx.utils import telemetry_utils
+
 
 # OpFunc represents the type of a function that takes as input a
 # dsl.ContainerOp and returns the same object. Common operations such as adding
@@ -249,6 +254,7 @@ class KubeflowDagRunner(tfx_runner.TfxRunner):
     if config and not isinstance(config, KubeflowDagRunnerConfig):
       raise TypeError('config must be type of KubeflowDagRunnerConfig.')
     super(KubeflowDagRunner, self).__init__(config or KubeflowDagRunnerConfig())
+    self._config = cast(KubeflowDagRunnerConfig, self._config)
     self._output_dir = output_dir or os.getcwd()
     self._output_filename = output_filename
     self._compiler = compiler.Compiler()
@@ -364,10 +370,25 @@ class KubeflowDagRunner(tfx_runner.TfxRunner):
     # can correctly match default value with PipelineParam.
     self._parse_parameter_from_pipeline(pipeline)
 
+    pipeline_ir = tfx_compiler.Compiler().compile(pipeline)
+
+    # Substitute the runtime parameter to be a concrete run_id
+    runtime_parameter_utils.substitute_runtime_parameter(
+        pipeline_ir, {
+            constants.PIPELINE_RUN_ID_PARAMETER_NAME:
+                datetime.datetime.now().isoformat(),
+        })
+
+    logging.info('Running pipeline:\n %s', pipeline_ir)
+
     file_name = self._output_filename or pipeline.pipeline_info.pipeline_name + '.tar.gz'
+
     # Create workflow spec and write out to package.
-    self._compiler._create_and_write_workflow(  # pylint: disable=protected-access
+    workflow = self._compiler._create_workflow(  # pylint: disable=protected-access
         pipeline_func=_construct_pipeline,
         pipeline_name=pipeline.pipeline_info.pipeline_name,
-        params_list=self._params,
-        package_path=os.path.join(self._output_dir, file_name))
+        params_list=self._params)
+    workflow['metadata']['TFX_DSL_IR'] = pipeline_ir
+    # self._compiler._validate_workflow(workflow)  # pylint: disable=protected-access
+    compiler.Compiler._write_workflow(  # pylint: disable=protected-access
+        workflow, os.path.join(self._output_dir, file_name))

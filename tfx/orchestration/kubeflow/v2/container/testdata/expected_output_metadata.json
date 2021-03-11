@@ -8,9 +8,6 @@
           "customProperties":{
             "my_property":{
               "stringValue":"my_value"
-            },
-            "tfx_version": {
-              "stringValue":"0.123.4.dev"
             }
           }
         }
@@ -28,9 +25,6 @@
             },
             "baseline_model_id": {
               "stringValue": "projects/123456789/locations/us-central1/metadataStores/default/artifacts/1"
-            },
-            "tfx_version": {
-              "stringValue":"0.123.4.dev"
             }
           }
         }

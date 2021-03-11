@@ -54,7 +54,7 @@ def update_output_artifact(
     output_artifact: the example artifact to be output.
   """
   output_artifact.custom_properties[
-      utils.FINGERPRINT_PROPERTY_NAME].string_value = str(
+      utils.FINGERPRINT_PROPERTY_NAME].string_value = (
           exec_properties[utils.FINGERPRINT_PROPERTY_NAME])
   output_artifact.custom_properties[
       utils.SPAN_PROPERTY_NAME].string_value = str(

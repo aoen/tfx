@@ -20,16 +20,16 @@ from __future__ import print_function
 
 import os
 import tarfile
-from typing import Text
 
 from kfp import onprem
 import tensorflow as tf
+from tfx.components.example_gen.csv_example_gen import component as csv_example_gen_component
 from tfx.components.statistics_gen import component as statistics_gen_component
 from tfx.dsl.io import fileio
-from tfx.extensions.google_cloud_big_query.example_gen import component as big_query_example_gen_component
-from tfx.orchestration import data_types
 from tfx.orchestration import pipeline as tfx_pipeline
 from tfx.orchestration.kubeflow import kubeflow_dag_runner
+from tfx.types import channel_utils
+from tfx.types import standard_artifacts
 from tfx.utils import telemetry_utils
 from tfx.utils import test_case_utils
 import yaml
@@ -39,10 +39,9 @@ from ml_metadata.proto import metadata_store_pb2
 
 # 2-step pipeline under test.
 def _two_step_pipeline() -> tfx_pipeline.Pipeline:
-  table_name = data_types.RuntimeParameter(
-      name='table-name', ptype=Text, default='default-table')
-  example_gen = big_query_example_gen_component.BigQueryExampleGen(
-      query='SELECT * FROM %s' % str(table_name))
+  examples = standard_artifacts.ExternalArtifact()
+  example_gen = csv_example_gen_component.CsvExampleGen(
+      input=channel_utils.as_channel([examples]))
   statistics_gen = statistics_gen_component.StatisticsGen(
       examples=example_gen.outputs['examples'])
   return tfx_pipeline.Pipeline(
@@ -137,6 +136,7 @@ class KubeflowDagRunnerTest(test_case_utils.TfxTest):
         'pipeline.yaml') as pipeline_file:
       self.assertIsNotNone(pipeline_file)
       pipeline = yaml.safe_load(pipeline_file)
+      print("I'm here pipeline: ", pipeline)
 
       containers = [
           c for c in pipeline['spec']['templates'] if 'container' in c

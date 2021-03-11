@@ -17,13 +17,9 @@
 import os
 
 from absl.testing import parameterized
-from absl.testing.absltest import mock
 import tensorflow as tf
 from tfx.orchestration import metadata
 from tfx.orchestration.experimental.core import async_pipeline_task_gen as asptg
-from tfx.orchestration.experimental.core import pipeline_state as pstate
-from tfx.orchestration.experimental.core import service_jobs
-from tfx.orchestration.experimental.core import status as status_lib
 from tfx.orchestration.experimental.core import task as task_lib
 from tfx.orchestration.experimental.core import task_queue as tq
 from tfx.orchestration.experimental.core import test_utils as otu
@@ -70,15 +66,7 @@ class AsyncPipelineTaskGeneratorTest(tu.TfxTest, parameterized.TestCase):
     self._trainer = pipeline.nodes[2].pipeline_node
 
     self._task_queue = tq.TaskQueue()
-
-    self._mock_service_job_manager = mock.create_autospec(
-        service_jobs.ServiceJobManager, instance=True)
-
-    def _is_pure_service_node(unused_pipeline_state, node_id):
-      return node_id == self._example_gen.node_info.id
-
-    self._mock_service_job_manager.is_pure_service_node.side_effect = (
-        _is_pure_service_node)
+    self._ignore_node_ids = set([self._example_gen.node_info.id])
 
   def _verify_exec_node_task(self, node, execution_id, task):
     self.assertEqual(
@@ -137,13 +125,11 @@ class AsyncPipelineTaskGeneratorTest(tu.TfxTest, parameterized.TestCase):
       self.assertLen(
           executions, num_initial_executions,
           'Expected {} execution(s) in MLMD.'.format(num_initial_executions))
-      pipeline_state = pstate.PipelineState.new(m, self._pipeline)
       task_gen = asptg.AsyncPipelineTaskGenerator(
           m,
-          pipeline_state,
+          self._pipeline,
           self._task_queue.contains_task_id,
-          self._mock_service_job_manager,
-          ignore_node_ids=ignore_node_ids or set())
+          ignore_node_ids=self._ignore_node_ids | (ignore_node_ids or set()))
       tasks = task_gen.generate()
       self.assertLen(
           tasks, num_tasks_generated,
@@ -163,8 +149,7 @@ class AsyncPipelineTaskGeneratorTest(tu.TfxTest, parameterized.TestCase):
               num_active_executions))
       if use_task_queue:
         for task in tasks:
-          if task_lib.is_exec_node_task(task):
-            self._task_queue.enqueue(task)
+          self._task_queue.enqueue(task)
       return tasks, active_executions
 
   @parameterized.parameters(0, 1)
@@ -175,13 +160,11 @@ class AsyncPipelineTaskGeneratorTest(tu.TfxTest, parameterized.TestCase):
         v.min_count = min_count
 
     with self._mlmd_connection as m:
-      pipeline_state = pstate.PipelineState.new(m, self._pipeline)
       task_gen = asptg.AsyncPipelineTaskGenerator(
           m,
-          pipeline_state,
+          self._pipeline,
           lambda _: False,
-          service_jobs.DummyServiceJobManager(),
-          ignore_node_ids=set([self._example_gen.node_info.id]))
+          ignore_node_ids=self._ignore_node_ids)
       tasks = task_gen.generate()
       self.assertEmpty(tasks, 'Expected no task generation when no inputs.')
       self.assertEmpty(
@@ -202,12 +185,10 @@ class AsyncPipelineTaskGeneratorTest(tu.TfxTest, parameterized.TestCase):
     # Simulate that ExampleGen has already completed successfully.
     otu.fake_example_gen_run(self._mlmd_connection, self._example_gen, 1, 1)
 
-    def _ensure_node_services(unused_pipeline_state, node_id):
-      self.assertEqual('my_example_gen', node_id)
-      return service_jobs.ServiceStatus.RUNNING
-
-    self._mock_service_job_manager.ensure_node_services.side_effect = (
-        _ensure_node_services)
+    # Before generation, there's 1 execution in MLMD.
+    with self._mlmd_connection as m:
+      executions = m.store.get_executions()
+    self.assertLen(executions, 1)
 
     # Generate once.
     with self.subTest(generate=1):
@@ -219,8 +200,6 @@ class AsyncPipelineTaskGeneratorTest(tu.TfxTest, parameterized.TestCase):
           num_active_executions=1)
       self._verify_exec_node_task(self._transform, active_executions[0].id,
                                   tasks[0])
-
-    self._mock_service_job_manager.ensure_node_services.assert_called()
 
     # No new effects if generate called again.
     with self.subTest(generate=2):
@@ -344,13 +323,6 @@ class AsyncPipelineTaskGeneratorTest(tu.TfxTest, parameterized.TestCase):
     # Simulate that ExampleGen has already completed successfully.
     otu.fake_example_gen_run(self._mlmd_connection, self._example_gen, 1, 1)
 
-    def _ensure_node_services(unused_pipeline_state, node_id):
-      self.assertEqual('my_example_gen', node_id)
-      return service_jobs.ServiceStatus.RUNNING
-
-    self._mock_service_job_manager.ensure_node_services.side_effect = (
-        _ensure_node_services)
-
     # Generate once.
     with self.subTest(generate=1):
       num_initial_executions = 1
@@ -377,25 +349,6 @@ class AsyncPipelineTaskGeneratorTest(tu.TfxTest, parameterized.TestCase):
       else:
         self._verify_exec_node_task(self._transform, active_executions[0].id,
                                     tasks[0])
-
-  def test_service_job_failed(self):
-    """Tests task generation when example-gen service job fails."""
-
-    def _ensure_node_services(unused_pipeline_state, node_id):
-      self.assertEqual('my_example_gen', node_id)
-      return service_jobs.ServiceStatus.FAILED
-
-    self._mock_service_job_manager.ensure_node_services.side_effect = (
-        _ensure_node_services)
-    tasks, _ = self._generate_and_test(
-        True,
-        num_initial_executions=0,
-        num_tasks_generated=1,
-        num_new_executions=0,
-        num_active_executions=0)
-    self.assertLen(tasks, 1)
-    self.assertTrue(task_lib.is_finalize_node_task(tasks[0]))
-    self.assertEqual(status_lib.Code.ABORTED, tasks[0].status.code)
 
 
 if __name__ == '__main__':
