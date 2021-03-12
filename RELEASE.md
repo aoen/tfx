@@ -17,7 +17,11 @@
 ### For Component Authors
 
 ## Deprecations
+
 *   Deprecated input/output compatibility aliases for Transform and StatisticsGen.
+
+*   Change split sub-folder format to 'Split-XXX', artifacts with old split
+    format can still be loaded by TFX.
 
 ## Bug Fixes and Other Changes
 *   The `tfx_version` custom property of output artifacts is now set by the

@@ -24,12 +24,20 @@ import json
 import os
 import re
 from typing import Dict, List, Optional, Text, Type
-
 import absl
+from packaging import version
+
 from tfx.types.artifact import _ArtifactType
 from tfx.types.artifact import Artifact
 
 from ml_metadata.proto import metadata_store_pb2
+
+
+ARTIFACT_TFX_VERSION_CUSTOM_PROPERTY_KEY = 'tfx_version'
+
+# TODO(b/182526033): deprecate old artifact payload format.
+# Version that "Split-{split_name}" is introduced.
+_ARTIFACT_VERSION_FOR_SPLIT_UPDATE = '0.29.0.dev'
 
 
 # TODO(ruoyu): Deprecate this function since it is no longer needed.
@@ -83,6 +91,28 @@ def get_single_uri(artifact_list: List[Artifact]) -> Text:
   return get_single_instance(artifact_list).uri
 
 
+def is_artifact_version_older_than(artifact: Artifact,
+                                   artifact_version: Text) -> bool:
+  """Check if artifact belongs to old version."""
+  if artifact.mlmd_artifact.state == metadata_store_pb2.Artifact.UNKNOWN:
+    # Newly generated artifact.
+    return False
+
+  # For artifact that resolved from MLMD.
+  if not artifact.has_custom_property(ARTIFACT_TFX_VERSION_CUSTOM_PROPERTY_KEY):
+    # Artifact without version.
+    return True
+
+  if (version.parse(
+      artifact.get_string_custom_property(
+          ARTIFACT_TFX_VERSION_CUSTOM_PROPERTY_KEY)) <
+      version.parse(artifact_version)):
+    # Artifact with old version.
+    return True
+  else:
+    return False
+
+
 def get_split_uris(artifact_list: List[Artifact], split: Text) -> List[Text]:
   """Get the uris of Artifacts with matching split from given list.
 
@@ -101,7 +131,11 @@ def get_split_uris(artifact_list: List[Artifact], split: Text) -> List[Text]:
   for artifact in artifact_list:
     split_names = decode_split_names(artifact.split_names)
     if split in split_names:
-      result.append(os.path.join(artifact.uri, split))
+      if is_artifact_version_older_than(artifact,
+                                        _ARTIFACT_VERSION_FOR_SPLIT_UPDATE):
+        result.append(os.path.join(artifact.uri, split))
+      else:
+        result.append(os.path.join(artifact.uri, f'Split-{split}'))
   if len(result) != len(artifact_list):
     raise ValueError('Split does not exist over all example artifacts: %s' %
                      split)
