@@ -1,4 +1,3 @@
-# Lint as: python2, python3
 # Copyright 2019 Google LLC. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,11 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Definition for Airflow component for TFX."""
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
 
 import functools
 from typing import Any, Dict, List, Text, Type
@@ -114,7 +108,6 @@ class AirflowComponent(python_operator.PythonOperator):
 
     super(AirflowComponent, self).__init__(
         task_id=component.id,
-        provide_context=True,
         python_callable=functools.partial(
             _airflow_component_launcher,
             component=component,
