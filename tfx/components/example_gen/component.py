@@ -64,6 +64,8 @@ class QueryBasedExampleGen(base_component.BaseComponent):
                                                                  Any]]] = None,
       custom_config: Optional[Union[example_gen_pb2.CustomConfig,
                                     Dict[Text, Any]]] = None,
+      range_config: Optional[Union[range_config_pb2.RangeConfig,
+                                   Dict[Text, Any]]] = None,
       output_data_format: Optional[int] = example_gen_pb2.FORMAT_TF_EXAMPLE,
       example_artifacts: Optional[types.Channel] = None,
       instance_name: Optional[Text] = None):
@@ -107,9 +109,11 @@ class QueryBasedExampleGen(base_component.BaseComponent):
       raise ValueError('The value of output_data_format must be defined in'
                        'the example_gen_pb2.PayloadFormat proto.')
 
+    # TODO(ddavydov) add docstrings for rangeconfig here and elsewhere
     spec = QueryBasedExampleGenSpec(
         input_config=input_config,
         output_config=output_config,
+        range_config=range_config,
         output_data_format=output_data_format,
         custom_config=custom_config,
         examples=example_artifacts)
@@ -150,10 +154,10 @@ class FileBasedExampleGen(base_component.BaseComponent):
                                                                Any]]] = None,
       output_config: Optional[Union[example_gen_pb2.Output, Dict[Text,
                                                                  Any]]] = None,
-      custom_config: Optional[Union[example_gen_pb2.CustomConfig,
-                                    Dict[Text, Any]]] = None,
       range_config: Optional[Union[range_config_pb2.RangeConfig,
                                    Dict[Text, Any]]] = None,
+      custom_config: Optional[Union[example_gen_pb2.CustomConfig,
+                                    Dict[Text, Any]]] = None,
       output_data_format: Optional[int] = example_gen_pb2.FORMAT_TF_EXAMPLE,
       example_artifacts: Optional[types.Channel] = None,
       custom_executor_spec: Optional[executor_spec.ExecutorSpec] = None,

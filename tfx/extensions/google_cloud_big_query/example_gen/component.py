@@ -26,6 +26,7 @@ from tfx.components.example_gen import utils
 from tfx.dsl.components.base import executor_spec
 from tfx.extensions.google_cloud_big_query.example_gen import executor
 from tfx.proto import example_gen_pb2
+from tfx.proto import range_config_pb2
 
 
 class BigQueryExampleGen(component.QueryBasedExampleGen):
@@ -41,6 +42,7 @@ class BigQueryExampleGen(component.QueryBasedExampleGen):
                query: Optional[Text] = None,
                input_config: Optional[example_gen_pb2.Input] = None,
                output_config: Optional[example_gen_pb2.Output] = None,
+               range_config: Optional[range_config_pb2.RangeConfig] = None,
                example_artifacts: Optional[types.Channel] = None,
                instance_name: Optional[Text] = None):
     """Constructs a BigQueryExampleGen component.
@@ -72,5 +74,6 @@ class BigQueryExampleGen(component.QueryBasedExampleGen):
     super(BigQueryExampleGen, self).__init__(
         input_config=input_config,
         output_config=output_config,
+        range_config=range_config,
         example_artifacts=example_artifacts,
         instance_name=instance_name)
