@@ -9,7 +9,7 @@ This example pipeline has two extra dependencies:
 To try this example, install tfx using
 
 ```
-pip install -U tfx[examples]
+pip install tfx[examples]
 ```
 
 This file will be updated with more information.

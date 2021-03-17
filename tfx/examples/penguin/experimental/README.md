@@ -1,9 +1,14 @@
-# Penguin Classification Scikit-learn Example
+# Penguin classification Example
 
-Expanded the penguin example pipeline with instructions for using
-[scikit-learn](https://scikit-learn.org/stable/) in addition to TensorFlow/Keras
-to write and train the model. The support for scikit-learn in TFX is still
-experimental.
+**Warning: This code is experimental and is not ready for use. We welcome
+feedback on this example.**
+
+The Penguin classification example introduces the TFX programming
+environment and shows you how to solve a classification problem using
+TFX.
+
+The Penguin classification example demonstrates the end-to-end workflow
+and steps of how to classify penguin species.
 
 ## Instructions
 
@@ -26,7 +31,9 @@ source ./penguin/bin/activate
 Then, install the dependencies required by the Penguin example:
 
 <pre class="devsite-terminal devsite-click-to-copy">
-pip install -U tfx[examples]
+pip install tfx==0.26.1 \
+  numpy==1.16.5 \
+  scikit-learn==0.20.4
 </pre>
 
 ### Local Example
