@@ -20,6 +20,7 @@ import tensorflow as tf
 from tfx import types
 from tfx import version as tfx_version
 from tfx.dsl.compiler import constants
+from tfx.dsl.io import fileio
 from tfx.orchestration import metadata
 from tfx.orchestration.portable import base_driver
 from tfx.orchestration.portable import base_executor_operator
@@ -91,6 +92,23 @@ class _FakeErrorExecutorOperator(base_executor_operator.BaseExecutorOperator):
     result.execution_result.code = 1
     result.execution_result.result_message = 'execution canceled.'
     return result
+
+
+class _FakeCleanUpExecutorOperator(base_executor_operator.BaseExecutorOperator):
+
+  SUPPORTED_EXECUTOR_SPEC_TYPE = [_PYTHON_CLASS_EXECUTABLE_SPEC]
+  SUPPORTED_PLATFORM_CONFIG_TYPE = None
+
+  def run_executor(
+      self, execution_info: data_types.ExecutionInfo
+  ) -> execution_result_pb2.ExecutorOutput:
+    # Although the following removing is typically not expected, but there is
+    # no way to prevent them from happening. We should make sure that the
+    # launcher can handle the double cleanup gracefully.
+    fileio.rmtree(execution_info.execution_output_uri)
+    fileio.rmtree(execution_info.stateful_working_dir)
+    fileio.rmtree(execution_info.tmp_dir)
+    return execution_result_pb2.ExecutorOutput()
 
 
 class _FakeExampleGenLikeDriver(base_driver.BaseDriver):
@@ -511,6 +529,60 @@ class LauncherTest(test_case_utils.TfxTest):
       self.assertProtoPartiallyEquals(
           """
           id: 4
+          type_id: 8
+          last_known_state: COMPLETE
+          """,
+          execution,
+          ignored_fields=[
+              'create_time_since_epoch', 'last_update_time_since_epoch'
+          ])
+
+  def testLauncher_ToleratesDoubleCleanup(self):
+    # Some executors or runtime enviroment may delete stateful_working_dir,
+    # tmp_dir and execution_output_uri unexpectedly. The launcher should handle
+    # such cases gracefully and proceed to a successful execution.
+    LauncherTest.fakeUpstreamOutputs(self._mlmd_connection, self._example_gen,
+                                     self._transform)
+
+    executor_operators = {
+        _PYTHON_CLASS_EXECUTABLE_SPEC: _FakeCleanUpExecutorOperator
+    }
+    test_launcher = launcher.Launcher(
+        pipeline_node=self._trainer,
+        mlmd_connection=self._mlmd_connection,
+        pipeline_info=self._pipeline_info,
+        pipeline_runtime_spec=self._pipeline_runtime_spec,
+        executor_spec=self._trainer_executor_spec,
+        custom_executor_operators=executor_operators)
+    execution_metadata = test_launcher.launch()
+
+    with self._mlmd_connection as m:
+      [artifact] = m.store.get_artifacts_by_type('Model')
+      self.assertProtoPartiallyEquals(
+          """
+          id: 3
+          type_id: 10
+          custom_properties {
+            key: "name"
+            value {
+              string_value: ":test_run_0:my_trainer:model:0"
+            }
+          }
+          custom_properties {
+            key: "tfx_version"
+            value {
+              string_value: "0.123.4.dev"
+            }
+          }
+          state: LIVE""",
+          artifact,
+          ignored_fields=[
+              'uri', 'create_time_since_epoch', 'last_update_time_since_epoch'
+          ])
+      [execution] = m.store.get_executions_by_id([execution_metadata.id])
+      self.assertProtoPartiallyEquals(
+          """
+          id: 3
           type_id: 8
           last_known_state: COMPLETE
           """,

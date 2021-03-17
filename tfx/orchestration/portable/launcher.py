@@ -348,7 +348,12 @@ class Launcher(object):
       self, execution_info: data_types.ExecutionInfo):
     logging.info('Cleaning up stateless execution info.')
     # Clean up tmp dir
-    fileio.rmtree(execution_info.tmp_dir)
+    try:
+      fileio.rmtree(execution_info.tmp_dir)
+    except fileio.NotFoundError:
+      logging.warning(
+          'execution_info.tmp_dir %s is not found, it is likely that it has '
+          'been deleted by the executor.', execution_info.tmp_dir)
 
   def _clean_up_stateful_execution_info(
       self, execution_info: data_types.ExecutionInfo):
